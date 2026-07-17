@@ -36,7 +36,7 @@ for i in $(seq 1 20); do
     echo "==> Healthy: $(curl -fsS http://127.0.0.1:27000/api/health)"
     lan_ip="$(hostname -I 2>/dev/null | awk '{print $1}')"
     echo "==> 本机访问: http://127.0.0.1:27000"
-    [ -n "$lan_ip" ] && echo "==> 局域网访问: http://${lan_ip}:27000  (Web UI；代理端口 27001-27999)"
+    [ -n "$lan_ip" ] && echo "==> 局域网访问: http://${lan_ip}:27000  (Web UI；代理端口 27100-27199)"
     exit 0
   fi
   sleep 1

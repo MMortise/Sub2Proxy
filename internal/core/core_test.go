@@ -74,23 +74,23 @@ func TestCreateMappingAutoAllocAndConflict(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if m1.Port != 27001 {
-		t.Fatalf("want auto-allocated 27001, got %d", m1.Port)
+	if m1.Port != 27100 {
+		t.Fatalf("want auto-allocated 27100, got %d", m1.Port)
 	}
 
-	// Second auto-alloc should get 27002.
+	// Second auto-alloc should get 27101.
 	n2, _ := a.AddManualNode(ssLink("us2"))
 	m2, err := a.CreateMapping(MappingInput{Name: "us-b", Strategy: model.StrategySingle,
 		Nodes: []model.NodeRef{{ID: n2.ID, Name: n2.Name}}})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if m2.Port != 27002 {
-		t.Fatalf("want 27002, got %d", m2.Port)
+	if m2.Port != 27101 {
+		t.Fatalf("want 27101, got %d", m2.Port)
 	}
 
 	// Explicit conflicting port -> 409 with owner name.
-	_, err = a.CreateMapping(MappingInput{Port: 27001, Name: "dup", Strategy: model.StrategySingle,
+	_, err = a.CreateMapping(MappingInput{Port: 27100, Name: "dup", Strategy: model.StrategySingle,
 		Nodes: []model.NodeRef{{ID: n.ID, Name: n.Name}}})
 	if err == nil || HTTPStatus(err) != http.StatusConflict {
 		t.Fatalf("want 409 conflict, got %v", err)
@@ -107,7 +107,7 @@ func TestCreateMappingAutoAllocAndConflict(t *testing.T) {
 func TestMappingDegradeDoesNotRewriteEnabled(t *testing.T) {
 	a := newTestApp(t)
 	n, _ := a.AddManualNode(ssLink("us1"))
-	_, err := a.CreateMapping(MappingInput{Port: 27001, Name: "us", Strategy: model.StrategySingle,
+	_, err := a.CreateMapping(MappingInput{Port: 27100, Name: "us", Strategy: model.StrategySingle,
 		Nodes: []model.NodeRef{{ID: n.ID, Name: n.Name}}})
 	if err != nil {
 		t.Fatal(err)

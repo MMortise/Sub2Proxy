@@ -19,8 +19,8 @@ import (
 const (
 	DefaultListen  = "0.0.0.0:27000"
 	DefaultDataDir = "/data"
-	DefaultPortLo  = 27001
-	DefaultPortHi  = 27999
+	DefaultPortLo  = 27100
+	DefaultPortHi  = 27199
 	FileMode       = 0o600
 )
 
@@ -163,7 +163,7 @@ func templateWithKey(key string) string {
 const templateYAML = `# sub2proxy configuration. See README for full field docs.
 listen: 0.0.0.0:27000          # Web UI / API listen address
 auth_key: "%s"                 # login key for UI and API (>= 8 chars). Auto-generated on first run; change to set your own.
-port_range: [27001, 27999]     # mapping port allocation range (match compose published range)
+port_range: [27100, 27199]     # mapping port allocation range (100 ports; match compose published range)
 data_dir: /data                # derived data (node cache) directory
 
 subscriptions: []              # added via the web UI

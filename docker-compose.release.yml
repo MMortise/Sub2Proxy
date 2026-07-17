@@ -7,9 +7,9 @@
 # Note: with the default "latest", Docker caches the download layer — to pick up a
 # newer release, rebuild with --no-cache (or pin an explicit version tag).
 #
-# Publishes the 27000-27999 range explicitly (bridge networking), same as the dev
-# compose. Binds all interfaces so the LAN can reach it; to restrict to this host
-# only, prefix with 127.0.0.1 (i.e. "127.0.0.1:27000-27999:27000-27999").
+# Publishes Web UI (27000) + the 27100-27199 mapping range explicitly (bridge),
+# same as the dev compose. Binds all interfaces so the LAN can reach it; to
+# restrict to this host only, prefix both with 127.0.0.1.
 services:
   sub2proxy:
     build:
@@ -21,7 +21,8 @@ services:
     container_name: sub2proxy
     restart: unless-stopped
     ports:
-      - "27000-27999:27000-27999"
+      - "27000:27000"
+      - "27100-27199:27100-27199"
     volumes:
       - ./data:/data
     healthcheck:
