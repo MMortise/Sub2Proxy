@@ -9,7 +9,11 @@
 set -euo pipefail
 
 REPO="MMortise/Sub2Proxy"
-PREFIX="${PREFIX:-/opt/sub2proxy}"
+# Install location defaults to the repo checkout this script lives in (deploy/..),
+# so paths are derived from where you cloned — nothing is hardcoded. Override with
+# PREFIX=/somewhere sudo -E deploy/install.sh.
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+PREFIX="${PREFIX:-$REPO_ROOT}"
 SERVICE_USER="sub2proxy"
 VERSION="${1:-}"
 
