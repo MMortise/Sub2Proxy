@@ -25,6 +25,7 @@ type Store struct {
 
 	mu    sync.Mutex
 	timer *time.Timer
+	dirty bool // set by Schedule; cleared on write. Guards Flush from clobbering.
 }
 
 // NewStore creates a Store writing to path, pulling data via snapshot.
@@ -37,6 +38,7 @@ func NewStore(path string, snapshot func() *Config) *Store {
 func (s *Store) Schedule() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	s.dirty = true
 	if s.timer != nil {
 		s.timer.Reset(s.debounce)
 		return
@@ -48,15 +50,21 @@ func (s *Store) Schedule() {
 	})
 }
 
-// Flush cancels any pending debounced write and persists immediately. Used on
-// shutdown (SIGTERM) so no mutation is lost.
+// Flush cancels any pending debounced write and persists immediately if there are
+// unwritten in-memory mutations. It is a no-op when nothing changed, so a manual
+// edit to config.yaml made while the app runs is NOT clobbered by the shutdown
+// write-back (e.g. hand-editing auth_key then restarting).
 func (s *Store) Flush() error {
 	s.mu.Lock()
 	if s.timer != nil {
 		s.timer.Stop()
 		s.timer = nil
 	}
+	dirty := s.dirty
 	s.mu.Unlock()
+	if !dirty {
+		return nil
+	}
 	return s.writeNow()
 }
 
@@ -64,6 +72,7 @@ func (s *Store) Flush() error {
 func (s *Store) writeNow() error {
 	s.mu.Lock()
 	s.timer = nil
+	s.dirty = false
 	s.mu.Unlock()
 
 	cfg := s.snapshot()

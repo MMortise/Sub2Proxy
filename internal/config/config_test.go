@@ -243,10 +243,33 @@ func TestStoreFlushWritesImmediately(t *testing.T) {
 		return &Config{Listen: DefaultListen, AuthKey: "supersecret", PortRange: [2]int{27001, 27999}, DataDir: "/data"}
 	}
 	s := NewStore(path, snap)
+	s.Schedule() // a pending mutation…
 	if err := s.Flush(); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := os.Stat(path); err != nil {
-		t.Fatalf("flush should have written the file: %v", err)
+		t.Fatalf("flush should have written the file after a mutation: %v", err)
+	}
+}
+
+// A Flush with no prior mutation must not touch the file, so a manual edit to
+// config.yaml made while the app is running isn't clobbered by the shutdown write.
+func TestStoreFlushCleanDoesNotClobber(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "config.yaml")
+	external := "auth_key: hand-edited-key\n"
+	if err := os.WriteFile(path, []byte(external), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	snap := func() *Config {
+		return &Config{Listen: DefaultListen, AuthKey: "in-memory-key", PortRange: [2]int{27001, 27999}, DataDir: "/data"}
+	}
+	s := NewStore(path, snap)
+	if err := s.Flush(); err != nil { // no Schedule -> clean -> must be a no-op
+		t.Fatal(err)
+	}
+	got, _ := os.ReadFile(path)
+	if string(got) != external {
+		t.Fatalf("clean flush must not overwrite an external edit; got %q", got)
 	}
 }
