@@ -7,12 +7,9 @@
 # Note: with the default "latest", Docker caches the download layer — to pick up a
 # newer release, rebuild with --no-cache (or pin an explicit version tag).
 #
-# Uses host networking: the app binds the whole 27000-27999 range directly on the
-# host, which avoids creating ~1000 docker-proxy port mappings (slow and heavy on a
-# busy host). This is a Linux-server deploy file. On Linux, host mode reaches the
-# LAN automatically; to restrict to this host only set `listen: 127.0.0.1:27000`
-# and 127.0.0.1 mapping ports in config.yaml. (Host mode is a no-op on Docker
-# Desktop/macOS — for local dev use docker-compose.yml instead.)
+# Publishes the 27000-27999 range explicitly (bridge networking), same as the dev
+# compose. Binds all interfaces so the LAN can reach it; to restrict to this host
+# only, prefix with 127.0.0.1 (i.e. "127.0.0.1:27000-27999:27000-27999").
 services:
   sub2proxy:
     build:
@@ -23,7 +20,8 @@ services:
     image: sub2proxy:release
     container_name: sub2proxy
     restart: unless-stopped
-    network_mode: host
+    ports:
+      - "27000-27999:27000-27999"
     volumes:
       - ./data:/data
     healthcheck:
