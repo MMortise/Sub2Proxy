@@ -7,9 +7,12 @@
 # Note: with the default "latest", Docker caches the download layer — to pick up a
 # newer release, rebuild with --no-cache (or pin an explicit version tag).
 #
-# Publishes Web UI (27000) + the 27100-27199 mapping range explicitly (bridge),
-# same as the dev compose. Binds all interfaces so the LAN can reach it; to
-# restrict to this host only, prefix both with 127.0.0.1.
+# Uses host networking: the app binds 27000 + the mapping ports directly on the
+# host, so there's no docker-proxy port-publishing step at all (bridge publishing
+# even ~100 ports adds noticeable startup latency). This is a Linux-server deploy
+# file. On Linux, host mode reaches the LAN automatically; to restrict to this host
+# only, set `listen: 127.0.0.1:27000` in config.yaml. (Host mode is a no-op on
+# Docker Desktop/macOS — for local dev use docker-compose.yml instead.)
 services:
   sub2proxy:
     build:
@@ -20,9 +23,7 @@ services:
     image: sub2proxy:release
     container_name: sub2proxy
     restart: unless-stopped
-    ports:
-      - "27000:27000"
-      - "27100-27199:27100-27199"
+    network_mode: host
     volumes:
       - ./data:/data
     healthcheck:
