@@ -29,15 +29,19 @@ RUN CGO_ENABLED=0 go build -trimpath -ldflags "-s -w -X main.version=${VERSION}"
 
 # --- Stage 3: minimal runtime ---
 FROM alpine:3.20
-# busybox already provides wget for the healthcheck; only certs + tzdata needed.
-RUN apk add --no-cache ca-certificates tzdata \
+# busybox already provides wget for the healthcheck; su-exec lets the entrypoint
+# drop to the non-root user after fixing the /data mount ownership.
+RUN apk add --no-cache ca-certificates tzdata su-exec \
     && adduser -D -u 10001 s2p \
     && mkdir -p /data && chown s2p:s2p /data
-USER s2p
 COPY --from=build /sub2proxy /usr/local/bin/sub2proxy
+COPY scripts/docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 VOLUME /data
 # Web UI (27000) + proxy mapping ports (27001-27999).
 EXPOSE 27000-27999
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
     CMD wget -qO- http://127.0.0.1:27000/api/health >/dev/null 2>&1 || exit 1
-ENTRYPOINT ["/usr/local/bin/sub2proxy", "-config", "/data/config.yaml"]
+# Start as root only to chown the bind mount; the entrypoint su-exec's to s2p.
+ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
+CMD ["/usr/local/bin/sub2proxy", "-config", "/data/config.yaml"]
