@@ -4,8 +4,8 @@
 #
 # Usage: sudo deploy/install.sh [vX.Y.Z]
 #   no argument  -> installs the latest release; pass a tag to pin a version.
-#   PREFIX=/path -> install location (default /opt/sub2proxy). Example:
-#                   PREFIX=/home/sub2proxy sudo -E deploy/install.sh
+#   PREFIX=/path -> install location (default: this repo checkout's dir).
+#                   Example: PREFIX=/opt/sub2proxy sudo -E deploy/install.sh
 set -euo pipefail
 
 REPO="MMortise/Sub2Proxy"
