@@ -1,0 +1,25 @@
+[Unit]
+Description=sub2proxy - subscription to multi-port proxy
+Documentation=https://github.com/MMortise/Sub2Proxy
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=sub2proxy
+Group=sub2proxy
+WorkingDirectory=/opt/sub2proxy
+# The binary embeds the web UI; config.yaml + node cache live under data/.
+ExecStart=/opt/sub2proxy/sub2proxy -config /opt/sub2proxy/data/config.yaml
+Restart=on-failure
+RestartSec=3
+
+# Hardening — the app only needs to bind local ports and read/write its data dir.
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadWritePaths=/opt/sub2proxy/data
+
+[Install]
+WantedBy=multi-user.target
