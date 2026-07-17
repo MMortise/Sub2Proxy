@@ -1,4 +1,3 @@
-# syntax=docker/dockerfile:1
 
 # --- Stage 1: build the web UI ---
 FROM node:22-alpine AS frontend
