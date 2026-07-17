@@ -1,0 +1,65 @@
+# node-pool Specification
+
+## Purpose
+TBD - created by archiving change build-sub2proxy-mvp. Update Purpose after archive.
+
+## Requirements
+
+### Requirement: 节点指纹与去重
+系统 SHALL 按以下算法计算节点指纹：取节点的 Clash proxy map，删除 `name` 键，递归将所有层级 map 按键名字典序排序后序列化为紧凑 JSON（无空白），对该 JSON 计算 SHA-256，十六进制小写即完整指纹（UI 展示取前 8 字符）。指纹相同的节点（含跨订阅、订阅与手动之间）SHALL 在节点池只保留一份：展示名取首个来源的名称，`sources` 记录全部来源（订阅 id 或 `manual`）。指纹 SHALL 作为节点在映射引用与刷新重关联中的稳定 ID。
+
+#### Scenario: 跨订阅重复节点
+- **WHEN** 两条订阅各含一个连接参数完全相同但名称不同的节点
+- **THEN** 节点池只出现一条，指纹一致，sources 含两条订阅 id
+
+#### Scenario: 节点改名不换指纹
+- **WHEN** 订阅刷新后某节点仅名称变化、连接参数不变
+- **THEN** 指纹不变，引用它的映射不受影响，池内更新为新名称
+
+#### Scenario: 连接参数变化即新节点
+- **WHEN** 刷新后某节点的服务器端口从 443 变为 8443、名称不变
+- **THEN** 旧指纹按消失处理、新指纹按新增入池，引用旧指纹的映射按消失规则降级
+
+### Requirement: 节点列表查询
+系统 SHALL 提供节点池查询，每条含：名称、协议类型、服务器地址、来源（订阅名或手动）、地区标注、最近延迟（未测为空）。地区标注 SHALL 从节点名称启发式提取：优先识别国旗 emoji，其次匹配常见地区关键词（至少覆盖：美国/US、英国/UK、日本/JP、韩国/KR、香港/HK、台湾/TW、新加坡/SG、德国/DE、法国/FR、加拿大/CA、澳大利亚/AU），无法识别标注为空。SHALL 支持按名称子串不区分大小写过滤。
+
+#### Scenario: 按地区过滤
+- **WHEN** 用户在节点列表输入「美国」
+- **THEN** 列表实时过滤出名称含「美国」的节点
+
+#### Scenario: 地区自动标注
+- **WHEN** 节点名为「🇺🇸 US-Los Angeles 01」
+- **THEN** 地区标注为美国（US）
+
+### Requirement: 节点延迟测速
+系统 SHALL 支持对单个节点或全量节点发起真实链路测速：通过该节点代理请求测速 URL（默认 `http://www.gstatic.com/generate_204`），单节点超时 5 秒，全量测速并发上限 8、同一节点在途请求去重。结果（毫秒或不可用）SHALL 仅存内存，重启清空。单节点测速 SHALL 同步返回结果；全量测速 SHALL 异步执行，进度经节点列表接口反映。
+
+#### Scenario: 单节点测速
+- **WHEN** 用户点击某节点测速
+- **THEN** 同步返回该节点实际代理链路延迟毫秒数；超时或连接失败显示不可用
+
+#### Scenario: 全量测速
+- **WHEN** 用户点击全量测速
+- **THEN** 立即返回已启动，后台以并发 8 逐个测速，节点列表延迟列随结果刷新
+
+### Requirement: 手动添加节点
+系统 SHALL 支持粘贴单条分享链接（vmess:// vless:// ss:// trojan:// socks:// 等）手动添加节点。解析复用订阅同一转换路径；解析失败返回 400 与原因。手动节点 SHALL 以原始链接持久化到 config.yaml 的 `manual_nodes`，加载时重新解析，不受订阅刷新影响；来源标注 `manual`。若指纹与订阅节点重合 SHALL 合并为一条、sources 同时含订阅与 manual——此时即使订阅侧消失，节点因 manual 来源仍保留。手动节点 SHALL 可删除（仅当其来源只有 manual 时）。
+
+#### Scenario: 粘贴 vless 链接
+- **WHEN** 用户提交合法 vless:// 链接
+- **THEN** 节点解析入池，来源标注 manual，config.yaml 记录原始链接，可被映射引用
+
+#### Scenario: 非法链接
+- **WHEN** 提交无法解析的字符串
+- **THEN** 返回 400 与解析失败原因，不入池
+
+#### Scenario: 手动与订阅重合
+- **WHEN** 手动添加的节点指纹与某订阅节点相同，随后该订阅刷新不再含此节点
+- **THEN** 节点仍在池中（manual 来源保留），引用它的映射不受影响
+
+### Requirement: 节点生命周期
+订阅刷新后，指纹不再出现于任何来源的节点 SHALL 从节点池移除；引用它的映射按 port-mapping 的节点消失规则处理。相同指纹在后续刷新中重现 SHALL 自动回池，且多节点组自动重新纳入该成员；已被自动禁用的映射保持禁用，等待人工启用。
+
+#### Scenario: 节点消失后重现
+- **WHEN** 某节点在一次刷新中消失、下一次刷新中以相同指纹重现
+- **THEN** 节点回池且指纹不变，failover 等多节点组自动重新纳入；因组清零被自动禁用的映射保持禁用，UI 提示可手动重新启用
