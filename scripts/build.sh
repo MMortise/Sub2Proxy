@@ -7,6 +7,20 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
+# Optionally pull latest code first. Defaults to NO, so an empty answer or an
+# unattended run (no TTY) never changes the working tree unexpectedly.
+reply=""
+read -rp "执行前是否先 git pull 拉取最新代码？[y/N] " reply || reply=""
+case "$reply" in
+  [yY] | [yY][eE][sS])
+    echo "==> git pull"
+    git pull
+    ;;
+  *)
+    echo "==> 跳过 git pull（使用当前代码）"
+    ;;
+esac
+
 echo "==> Building image and starting container (docker compose up -d --build)"
 docker compose up -d --build
 
