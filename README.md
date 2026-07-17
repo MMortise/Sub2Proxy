@@ -25,6 +25,25 @@ docker compose logs | grep auth_key
 
 不用 Docker 也行：`go build ./cmd/sub2proxy && ./sub2proxy -config ./config.yaml`（需要 Go 1.26+，前端需先 `cd web/frontend && pnpm build`）。
 
+## 二进制部署（推荐，无需在服务器上编译）
+
+在服务器上构建镜像会把内嵌的整个 mihomo 内核重新编译一遍（很慢，且需能访问 Docker Hub）。改用预编译二进制：在本地打包上传到 GitHub Release，服务器直接下载对应架构的二进制运行，用 systemd 托管。
+
+发布（在有 Go + pnpm 的机器上，一条命令）：
+
+```bash
+scripts/release.sh v0.1.0   # 构建前端 + 交叉编译 linux amd64/arm64（内嵌 UI）→ 发布到 GitHub Release
+```
+
+服务器安装 / 升级（root，仓库目录下执行）：
+
+```bash
+sudo deploy/install.sh v0.1.0                 # 按架构下载二进制 + 装 systemd 单元 + 起服务
+journalctl -u sub2proxy | grep auth_key       # 读首次自动生成的登录 key
+```
+
+二进制直接在宿主机监听 `27000-27999`：无需 Docker、无端口发布开销、无挂载权限问题。`config.yaml` 与节点缓存位于 `/opt/sub2proxy/data`。
+
 ## 端口约定
 
 | 端口 | 用途 |
@@ -34,8 +53,8 @@ docker compose logs | grep auth_key
 
 Docker 端口发布是容器创建时静态确定的，所以整段 `27000-27999` 一次性发布。**若修改 `config.yaml` 的 `port_range`，必须同步修改 `docker-compose.yml` 的端口发布段**，否则新端口无法从宿主机访问。
 
-默认 compose 把端口段绑到 `127.0.0.1`（仅本机可达）。要让局域网其他设备访问，把 `docker-compose.yml` 里的
-`"127.0.0.1:27000-27999:27000-27999"` 改为 `"27000-27999:27000-27999"`。
+默认 compose 把端口段绑到所有网卡，局域网其他设备可直接访问。要限制为**仅本机**，把 `docker-compose.yml` 里的
+`"27000-27999:27000-27999"` 改回 `"127.0.0.1:27000-27999:27000-27999"`。⚠️ 代理端口（27001–27999）只有在映射里设置了用户名/密码时才有认证，否则局域网内任何人都能使用。
 
 ## 出口策略
 
