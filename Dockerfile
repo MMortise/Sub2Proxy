@@ -1,3 +1,6 @@
+# Dev / from-source image: builds the web UI and compiles the Go binary (with the
+# embedded mihomo core), so it needs no published release. Slow but self-contained.
+# For a fast deploy from a prebuilt binary, use Dockerfile.release instead.
 
 # --- Stage 1: build the web UI ---
 FROM node:22-alpine AS frontend

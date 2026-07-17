@@ -13,5 +13,6 @@ web/frontend/dist
 web/frontend/node_modules
 *.md
 sub2proxy
+dist-release
 config.yaml
 data

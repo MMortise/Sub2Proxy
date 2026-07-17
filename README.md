@@ -10,20 +10,33 @@
 
 ## 快速开始（Docker）
 
-```bash
-# 拉起容器（首次会在 ./data 下自动生成 config.yaml 并随机生成一个登录 key）
-docker compose up -d
+两套 Docker 部署，容器运行时**完全一致**（同样的 `/data` 卷、非 root、端口），区别只在镜像怎么来：
 
-# 从日志里读出自动生成的登录 key
-docker compose logs | grep auth_key
-# => auth_key was empty; generated one: <你的登录 key>  (change it in /data/config.yaml to set your own)
+**A. 发布版（推荐，快）** — 拉 GitHub Release 的预编译二进制，本机不编译、不需 Go/Node：
+
+```bash
+docker compose -f docker-compose.release.yml up -d --build
+# 指定版本：SUB2PROXY_VERSION=v0.1.0 docker compose -f docker-compose.release.yml up -d --build
 ```
 
-打开 `http://127.0.0.1:27000`，用日志里的 key 登录。想自定义 key：编辑 `./data/config.yaml` 的 `auth_key`（≥8 字符）后 `docker compose restart`。
+**B. 源码版（开发用，慢）** — 从源码构建（含内嵌 mihomo，需能访问 Docker Hub）：
+
+```bash
+docker compose up -d --build
+```
+
+两者首次启动都会在 `./data` 生成 `config.yaml` 并随机生成登录 key：
+
+```bash
+docker compose logs | grep auth_key           # 源码版
+# 发布版加 -f：docker compose -f docker-compose.release.yml logs | grep auth_key
+```
+
+打开 `http://<主机>:27000` 用该 key 登录。自定义 key：编辑 `./data/config.yaml` 的 `auth_key`（≥8 字符）后 `docker compose restart`。
 
 登录后：添加订阅 → 节点列表测速 → 建端口映射 → 内网程序用 `http://<主机>:27001` 等出口。
 
-不用 Docker 也行：`go build ./cmd/sub2proxy && ./sub2proxy -config ./config.yaml`（需要 Go 1.26+，前端需先 `cd web/frontend && pnpm build`）。
+不用 Docker：见下方「二进制部署」（systemd），或 `go build ./cmd/sub2proxy`（需 Go 1.26+，前端先 `cd web/frontend && pnpm build`）。
 
 ## 二进制部署（推荐，无需在服务器上编译）
 

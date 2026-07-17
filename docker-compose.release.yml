@@ -1,0 +1,31 @@
+# Release deploy — run a prebuilt binary from GitHub Releases (no compiling):
+#   docker compose -f docker-compose.release.yml up -d --build
+#
+# Pin a version with SUB2PROXY_VERSION (default: latest release):
+#   SUB2PROXY_VERSION=v0.1.0 docker compose -f docker-compose.release.yml up -d --build
+#
+# Note: with the default "latest", Docker caches the download layer — to pick up a
+# newer release, rebuild with --no-cache (or pin an explicit version tag).
+#
+# Ports/volumes/auth behave exactly like docker-compose.yml (dev). To restrict to
+# this host only, prefix the ports with 127.0.0.1.
+services:
+  sub2proxy:
+    build:
+      context: .
+      dockerfile: Dockerfile.release
+      args:
+        SUB2PROXY_VERSION: ${SUB2PROXY_VERSION:-latest}
+    image: sub2proxy:release
+    container_name: sub2proxy
+    restart: unless-stopped
+    ports:
+      - "27000-27999:27000-27999"
+    volumes:
+      - ./data:/data
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:27000/api/health"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 5s

@@ -1,0 +1,42 @@
+# Release image: pull a prebuilt static binary from GitHub Releases instead of
+# compiling from source. Fast (no Go/Node toolchain, no mihomo recompile) and the
+# runtime is byte-for-byte the same as the dev Dockerfile's final stage, so the
+# container behaves identically either way.
+#
+# Select a version at build time (default: latest release):
+#   docker build -f Dockerfile.release --build-arg SUB2PROXY_VERSION=v0.1.0 -t sub2proxy:release .
+FROM alpine:3.20
+
+# TARGETARCH is provided by BuildKit (amd64/arm64) and matches the release asset
+# suffix. SUB2PROXY_VERSION is a release tag, or "latest" for the newest release.
+ARG TARGETARCH
+ARG SUB2PROXY_VERSION=latest
+ARG REPO=MMortise/Sub2Proxy
+
+# ca-certificates + tzdata + su-exec mirror the dev runtime; curl is installed as a
+# throwaway just to fetch the binary, then removed so the image stays slim.
+RUN apk add --no-cache ca-certificates tzdata su-exec \
+    && adduser -D -u 10001 s2p \
+    && mkdir -p /data && chown s2p:s2p /data \
+    && apk add --no-cache --virtual .fetch curl \
+    && arch="${TARGETARCH:-amd64}" \
+    && if [ "$SUB2PROXY_VERSION" = "latest" ]; then \
+         url="https://github.com/${REPO}/releases/latest/download/sub2proxy-linux-${arch}"; \
+       else \
+         url="https://github.com/${REPO}/releases/download/${SUB2PROXY_VERSION}/sub2proxy-linux-${arch}"; \
+       fi \
+    && echo "fetching ${url}" \
+    && curl -fL --retry 3 -o /usr/local/bin/sub2proxy "$url" \
+    && chmod +x /usr/local/bin/sub2proxy \
+    && apk del .fetch
+
+COPY scripts/docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
+VOLUME /data
+# Web UI (27000) + proxy mapping ports (27001-27999).
+EXPOSE 27000-27999
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+    CMD wget -qO- http://127.0.0.1:27000/api/health >/dev/null 2>&1 || exit 1
+# Start as root only to chown the bind mount; the entrypoint su-exec's to s2p.
+ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
+CMD ["/usr/local/bin/sub2proxy", "-config", "/data/config.yaml"]
