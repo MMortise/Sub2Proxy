@@ -1,8 +1,8 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { AlertTriangle, Network, Pencil, Plus, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { api, ApiError, errMessage } from '@/lib/api'
-import { STRATEGY_LABEL, type Mapping, type Node } from '@/lib/types'
+import { STRATEGY_LABEL, type Mapping, type Node, type Subscription } from '@/lib/types'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -23,10 +23,12 @@ import { EmptyState } from '@/components/empty-state'
 import { ErrorState } from '@/components/error-state'
 import { PageHeader } from '@/components/page-header'
 import { MappingDialog } from '@/components/mapping-dialog'
+import { MappingSpeedtest } from '@/components/mapping-speedtest'
 
 export function MappingsPage() {
   const [mappings, setMappings] = useState<Mapping[]>([])
   const [nodes, setNodes] = useState<Node[]>([])
+  const [subs, setSubs] = useState<Subscription[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [dialogOpen, setDialogOpen] = useState(false)
@@ -56,7 +58,26 @@ export function MappingsPage() {
   useEffect(() => {
     load()
     refreshNodes()
+    api.listSubscriptions().then(setSubs).catch(() => {})
   }, [load, refreshNodes])
+
+  // Subscription id -> name, for labelling nodes in the speedtest popover.
+  const subName = useMemo(() => {
+    const m: Record<string, string> = {}
+    for (const s of subs) m[s.id] = s.name
+    return m
+  }, [subs])
+
+  // Copy host:port (as used by client programs) from the port cell.
+  const copyPort = async (port: number) => {
+    const target = `${window.location.hostname}:${port}`
+    try {
+      await navigator.clipboard.writeText(target)
+      toast.success(`已复制 ${target}`)
+    } catch {
+      toast.error('复制失败')
+    }
+  }
 
   const openCreate = () => {
     setEditing(null)
@@ -147,7 +168,16 @@ export function MappingsPage() {
                 const problem = !!m.disabled_reason
                 return (
                   <TableRow key={m.port} className={cn(problem && 'bg-destructive/5')}>
-                    <TableCell className="font-mono font-medium tabular-nums">{m.port}</TableCell>
+                    <TableCell className="font-mono font-medium tabular-nums">
+                      <button
+                        type="button"
+                        onClick={() => copyPort(m.port)}
+                        className="rounded transition-colors hover:text-primary hover:underline"
+                        title="点击复制 host:端口"
+                      >
+                        {m.port}
+                      </button>
+                    </TableCell>
                     <TableCell className="font-medium">{m.name || '-'}</TableCell>
                     <TableCell>
                       <Badge variant="outline">{STRATEGY_LABEL[m.strategy] ?? m.strategy}</Badge>
@@ -186,6 +216,7 @@ export function MappingsPage() {
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center justify-end gap-1">
+                        <MappingSpeedtest mapping={m} nodes={nodes} subName={subName} />
                         <Button
                           variant="ghost"
                           size="icon-sm"
