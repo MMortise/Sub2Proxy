@@ -24,6 +24,9 @@ web/frontend/node_modules/
 *.test
 *.out
 
+# Release build output (scripts/release.sh) — published to GitHub Releases, not git
+/dist-release/
+
 # Runtime data (node cache, sqlite) — regenerated at runtime
 /data/
 
