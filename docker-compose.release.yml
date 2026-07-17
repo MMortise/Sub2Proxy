@@ -24,6 +24,11 @@ services:
     container_name: sub2proxy
     restart: unless-stopped
     network_mode: host
+    # Host mode does the actual binding on the host; `expose` only documents the
+    # ports here (it does NOT publish — `ports:` would be ignored under host mode).
+    expose:
+      - "27000"        # Web UI / API
+      - "27100-27199"  # proxy mapping ports
     volumes:
       - ./data:/data
     healthcheck:
