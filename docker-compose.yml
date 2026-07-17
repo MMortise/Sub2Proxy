@@ -1,0 +1,29 @@
+# sub2proxy — one-command deploy: `docker compose up -d`
+#
+# Ports:
+#   27000       Web UI / API
+#   27001-27999 proxy mapping ports (each mapping binds one port in this range)
+#
+# The published range below is bound to 127.0.0.1 (host-only) by default. To let
+# other machines on your LAN reach the proxies, change the two mappings to
+# "27000-27999:27000-27999" (drop the 127.0.0.1 prefix). If you shrink/grow the
+# range, keep it in sync with `port_range` in config.yaml.
+services:
+  sub2proxy:
+    build: .
+    image: sub2proxy:latest
+    container_name: sub2proxy
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:27000-27999:27000-27999"
+    volumes:
+      # Single data volume: config.yaml (source of truth) + nodes.json cache live
+      # here. On first run the app writes a config.yaml template into ./data;
+      # edit ./data/config.yaml to set auth_key, then restart.
+      - ./data:/data
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:27000/api/health"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 5s

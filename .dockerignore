@@ -1,0 +1,17 @@
+# Keep the build context small. web/dist is intentionally NOT ignored: the Go
+# build embeds it, and the frontend stage regenerates it anyway.
+.git
+.gitignore
+.claude
+.codex
+.omx
+.agents
+openspec
+cmd/poc
+**/node_modules
+web/frontend/dist
+web/frontend/node_modules
+*.md
+sub2proxy
+config.yaml
+data

@@ -1,0 +1,104 @@
+mode: rule
+log-level: warning
+proxies:
+    - cipher: aes-256-gcm
+      name: 美国 1
+      password: secret
+      port: 8388
+      server: 1.1.1.1
+      type: ss
+    - cipher: aes-256-gcm
+      name: 英国 1
+      password: secret
+      port: 8388
+      server: 5.5.5.5
+      type: ss
+    - cipher: aes-256-gcm
+      name: 美国 2
+      password: secret
+      port: 8388
+      server: 2.2.2.2
+      type: ss
+    - cipher: aes-256-gcm
+      name: 香港 1
+      password: secret
+      port: 8388
+      server: 3.3.3.3
+      type: ss
+    - cipher: aes-256-gcm
+      name: '香港 1 #2'
+      password: secret
+      port: 8388
+      server: 4.4.4.4
+      type: ss
+proxy-groups:
+    - name: pg-27002
+      type: fallback
+      proxies:
+        - 美国 1
+        - 美国 2
+      url: http://www.gstatic.com/generate_204
+      interval: 300
+    - name: pg-27003
+      type: load-balance
+      proxies:
+        - 美国 1
+        - 美国 2
+      strategy: round-robin
+      url: http://www.gstatic.com/generate_204
+      interval: 300
+    - name: pg-27004
+      type: load-balance
+      proxies:
+        - 香港 1
+        - '香港 1 #2'
+      strategy: consistent-hashing
+      url: http://www.gstatic.com/generate_204
+      interval: 300
+    - name: pg-27005
+      type: load-balance
+      proxies:
+        - 美国 1
+      strategy: sticky-sessions
+      url: http://www.gstatic.com/generate_204
+      interval: 300
+    - name: pg-27006
+      type: url-test
+      proxies:
+        - 美国 1
+        - 香港 1
+      url: http://www.gstatic.com/generate_204
+      interval: 300
+listeners:
+    - name: in-27001
+      type: mixed
+      port: 27001
+      listen: 0.0.0.0
+      proxy: 英国 1
+    - name: in-27002
+      type: mixed
+      port: 27002
+      listen: 0.0.0.0
+      proxy: pg-27002
+    - name: in-27003
+      type: mixed
+      port: 27003
+      listen: 0.0.0.0
+      proxy: pg-27003
+    - name: in-27004
+      type: mixed
+      port: 27004
+      listen: 0.0.0.0
+      proxy: pg-27004
+    - name: in-27005
+      type: mixed
+      port: 27005
+      listen: 0.0.0.0
+      proxy: pg-27005
+    - name: in-27006
+      type: mixed
+      port: 27006
+      listen: 0.0.0.0
+      proxy: pg-27006
+rules:
+    - MATCH,DIRECT
