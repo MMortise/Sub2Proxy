@@ -36,7 +36,7 @@ gh release create "${VERSION}" "${OUT_DIR}"/* \
   --notes "sub2proxy ${VERSION} — 预编译二进制（已内嵌 Web UI）。Linux amd64 / arm64。
 
 服务器部署（无需编译）：
-    sudo deploy/install.sh ${VERSION}
+    sudo deploy/install.sh            # 装最新版；或 deploy/install.sh ${VERSION} 指定版本
 或手动下载对应架构的 sub2proxy-linux-<amd64|arm64> 直接运行。"
 
 echo "==> Done: https://github.com/$(gh repo view --json nameWithOwner -q .nameWithOwner)/releases/tag/${VERSION}"

@@ -3,13 +3,24 @@
 # binary — no compiling on the server. Run as root from a repo checkout (it uses
 # deploy/sub2proxy.service next to this script).
 #
-# Usage: sudo deploy/install.sh vX.Y.Z
+# Usage: sudo deploy/install.sh [vX.Y.Z]
+#   no argument -> installs the latest release; pass a tag to pin a version.
 set -euo pipefail
 
 REPO="MMortise/Sub2Proxy"
 PREFIX="/opt/sub2proxy"
-VERSION="${1:?usage: deploy/install.sh vX.Y.Z (e.g. v0.1.0)}"
+VERSION="${1:-}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# No version given: resolve the latest release tag from the GitHub API (no gh/jq
+# needed). Pass a tag explicitly to pin/downgrade.
+if [ -z "$VERSION" ]; then
+  echo "==> Resolving latest release tag"
+  VERSION="$(curl -fsSL "https://api.github.com/repos/${REPO}/releases/latest" \
+    | grep -m1 '"tag_name"' | sed -E 's/.*"tag_name" *: *"([^"]+)".*/\1/')"
+  [ -n "$VERSION" ] || { echo "could not resolve latest release tag" >&2; exit 1; }
+fi
+echo "==> Target version: ${VERSION}"
 
 case "$(uname -m)" in
   x86_64)          arch=amd64 ;;
