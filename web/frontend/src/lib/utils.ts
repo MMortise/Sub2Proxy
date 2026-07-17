@@ -61,6 +61,39 @@ export function formatExpire(unixSec: number): string {
   })
 }
 
+/**
+ * Copy text to the clipboard, with a fallback for non-secure contexts.
+ * navigator.clipboard is undefined over plain HTTP on a LAN IP (it needs a
+ * secure context: HTTPS or localhost), so fall back to a hidden textarea +
+ * execCommand('copy'), which still works there.
+ */
+export async function copyText(text: string): Promise<boolean> {
+  try {
+    if (navigator.clipboard && window.isSecureContext) {
+      await navigator.clipboard.writeText(text)
+      return true
+    }
+  } catch {
+    // fall through to the legacy path
+  }
+  try {
+    const ta = document.createElement('textarea')
+    ta.value = text
+    ta.style.position = 'fixed'
+    ta.style.top = '0'
+    ta.style.left = '0'
+    ta.style.opacity = '0'
+    document.body.appendChild(ta)
+    ta.focus()
+    ta.select()
+    const ok = document.execCommand('copy')
+    document.body.removeChild(ta)
+    return ok
+  } catch {
+    return false
+  }
+}
+
 /** Truncate a string in the middle for compact display of long URLs. */
 export function truncateMiddle(s: string, max = 48): string {
   if (s.length <= max) return s

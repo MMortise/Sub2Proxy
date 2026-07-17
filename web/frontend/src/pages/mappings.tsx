@@ -3,7 +3,7 @@ import { AlertTriangle, Network, Pencil, Plus, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { api, ApiError, errMessage } from '@/lib/api'
 import { STRATEGY_LABEL, type Mapping, type Node, type Subscription } from '@/lib/types'
-import { cn } from '@/lib/utils'
+import { cn, copyText } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card } from '@/components/ui/card'
@@ -68,15 +68,13 @@ export function MappingsPage() {
     return m
   }, [subs])
 
+  const host = window.location.hostname
+
   // Copy host:port (as used by client programs) from the port cell.
   const copyPort = async (port: number) => {
-    const target = `${window.location.hostname}:${port}`
-    try {
-      await navigator.clipboard.writeText(target)
-      toast.success(`已复制 ${target}`)
-    } catch {
-      toast.error('复制失败')
-    }
+    const target = `${host}:${port}`
+    if (await copyText(target)) toast.success(`已复制 ${target}`)
+    else toast.error('复制失败')
   }
 
   const openCreate = () => {
@@ -169,14 +167,18 @@ export function MappingsPage() {
                 return (
                   <TableRow key={m.port} className={cn(problem && 'bg-destructive/5')}>
                     <TableCell className="font-mono font-medium tabular-nums">
-                      <button
-                        type="button"
-                        onClick={() => copyPort(m.port)}
-                        className="rounded transition-colors hover:text-primary hover:underline"
-                        title="点击复制 host:端口"
-                      >
-                        {m.port}
-                      </button>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <button
+                            type="button"
+                            onClick={() => copyPort(m.port)}
+                            className="cursor-pointer rounded transition-colors hover:text-primary hover:underline"
+                          >
+                            {m.port}
+                          </button>
+                        </TooltipTrigger>
+                        <TooltipContent>http://{host}:{m.port}</TooltipContent>
+                      </Tooltip>
                     </TableCell>
                     <TableCell className="font-medium">{m.name || '-'}</TableCell>
                     <TableCell>
