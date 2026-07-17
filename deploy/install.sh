@@ -60,7 +60,10 @@ mappings: []
 EOF
   chmod 600 "$PREFIX/data/config.yaml"
 fi
-chown -R "$SERVICE_USER:$SERVICE_USER" "$PREFIX"
+# Only own the binary + data dir — never chown -R the whole PREFIX, which may be a
+# git checkout (e.g. PREFIX=/home/sub2proxy) whose ownership we must not rewrite.
+chown "$SERVICE_USER:$SERVICE_USER" "$PREFIX/sub2proxy"
+chown -R "$SERVICE_USER:$SERVICE_USER" "$PREFIX/data"
 
 echo "==> Installing systemd unit"
 # Generated with this install's paths. Kept intentionally minimal: filesystem
