@@ -4,10 +4,13 @@
 #   27000       Web UI / API
 #   27001-27999 proxy mapping ports (each mapping binds one port in this range)
 #
-# The published range below is bound to 127.0.0.1 (host-only) by default. To let
-# other machines on your LAN reach the proxies, change the two mappings to
-# "27000-27999:27000-27999" (drop the 127.0.0.1 prefix). If you shrink/grow the
-# range, keep it in sync with `port_range` in config.yaml.
+# The published range binds to all interfaces so other machines on the LAN can
+# reach the Web UI and proxy ports. Note: the Web UI (27000) is protected by the
+# login key, but a proxy port (27001-27999) is only protected if you set a
+# username/password on that mapping — otherwise anyone on the LAN can use it. To
+# restrict everything to this host only, prefix both sides with 127.0.0.1
+# (i.e. "127.0.0.1:27000-27999:27000-27999"). If you shrink/grow the range, keep
+# it in sync with `port_range` in config.yaml.
 services:
   sub2proxy:
     build: .
@@ -15,7 +18,7 @@ services:
     container_name: sub2proxy
     restart: unless-stopped
     ports:
-      - "127.0.0.1:27000-27999:27000-27999"
+      - "27000-27999:27000-27999"
     volumes:
       # Single data volume: config.yaml (source of truth) + nodes.json cache live
       # here. On first run the app writes a config.yaml template into ./data;
