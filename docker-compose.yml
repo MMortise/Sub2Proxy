@@ -30,3 +30,14 @@ services:
       timeout: 3s
       retries: 3
       start_period: 5s
+
+# Uses a bridge network, so pin its subnet instead of letting Docker pick. Left
+# to itself Docker hands out a /20, and once the 172.16-172.31 pools are used up
+# it starts carving those /20s out of 192.168.0.0/16 — on a host whose LAN is in
+# 192.168.x that swallows real addresses and blackholes their traffic. Change the
+# subnet if it collides.
+networks:
+  default:
+    ipam:
+      config:
+        - subnet: 10.201.27.0/24
