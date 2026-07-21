@@ -8,8 +8,8 @@
 # newer release, rebuild with --no-cache (or pin an explicit version tag).
 #
 # Uses host networking: the app binds 27000 + the mapping ports directly on the
-# host, so there's no docker-proxy port-publishing step at all (bridge publishing
-# even ~100 ports adds noticeable startup latency). This is a Linux-server deploy
+# host, so there's no docker-proxy port-publishing step at all (bridge mode adds
+# per-port startup latency). This is a Linux-server deploy
 # file. On Linux, host mode reaches the LAN automatically; to restrict to this host
 # only, set `listen: 127.0.0.1:27000` in config.yaml. (Host mode is a no-op on
 # Docker Desktop/macOS — for local dev use docker-compose.yml instead.)
@@ -28,7 +28,7 @@ services:
     # ports here (it does NOT publish — `ports:` would be ignored under host mode).
     expose:
       - "27000"        # Web UI / API
-      - "27100-27199"  # proxy mapping ports
+      - "27001-27020"  # proxy mapping ports
     volumes:
       - ./data:/data
     healthcheck:

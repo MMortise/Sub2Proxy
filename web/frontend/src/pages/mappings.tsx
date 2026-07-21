@@ -2,7 +2,14 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { AlertTriangle, Network, Pencil, Plus, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { api, ApiError, errMessage } from '@/lib/api'
-import { STRATEGY_LABEL, type Mapping, type Node, type Subscription } from '@/lib/types'
+import {
+  STRATEGY_LABEL,
+  type Mapping,
+  type Node,
+  type PortRange,
+  type PortUsage,
+  type Subscription,
+} from '@/lib/types'
 import { cn, copyText } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -27,6 +34,7 @@ import { MappingSpeedtest } from '@/components/mapping-speedtest'
 
 export function MappingsPage() {
   const [mappings, setMappings] = useState<Mapping[]>([])
+  const [portRange, setPortRange] = useState<PortRange | null>(null)
   const [nodes, setNodes] = useState<Node[]>([])
   const [subs, setSubs] = useState<Subscription[]>([])
   const [loading, setLoading] = useState(true)
@@ -59,6 +67,8 @@ export function MappingsPage() {
     load()
     refreshNodes()
     api.listSubscriptions().then(setSubs).catch(() => {})
+    // Config-derived and fixed for the process lifetime, so once is enough.
+    api.mappingPortRange().then(setPortRange).catch(() => {})
   }, [load, refreshNodes])
 
   // Subscription id -> name, for labelling nodes in the speedtest popover.
@@ -69,6 +79,20 @@ export function MappingsPage() {
   }, [subs])
 
   const host = window.location.hostname
+
+  // The server rejects any mapping outside port_range, so the rows already on
+  // hand are the ports in use — deriving beats refetching a count after every
+  // create, delete and toggle.
+  const usage = useMemo<PortUsage | null>(
+    () =>
+      portRange && {
+        ...portRange,
+        used: mappings.length,
+        free: portRange.capacity - mappings.length,
+      },
+    [portRange, mappings.length],
+  )
+  const full = !!usage && usage.free <= 0
 
   // Copy host:port (as used by client programs) from the port cell.
   const copyPort = async (port: number) => {
@@ -82,6 +106,15 @@ export function MappingsPage() {
     setDialogOpen(true)
     refreshNodes()
   }
+
+  // Rendered bare, or wrapped in a tooltip when the range is full — hoisted so
+  // both branches share one definition.
+  const createButton = (
+    <Button onClick={openCreate} disabled={full}>
+      <Plus className="h-4 w-4" />
+      创建映射
+    </Button>
+  )
 
   const openEdit = (m: Mapping) => {
     setEditing(m)
@@ -124,10 +157,33 @@ export function MappingsPage() {
         title="端口映射"
         description="将本地端口绑定到节点组，按策略转发流量"
         actions={
-          <Button onClick={openCreate}>
-            <Plus className="h-4 w-4" />
-            创建映射
-          </Button>
+          <>
+            {usage && (
+              <Badge
+                variant={full ? 'destructive' : 'secondary'}
+                className="font-normal"
+              >
+                端口 {usage.used}/{usage.capacity}
+              </Badge>
+            )}
+            {usage && full ? (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  {/* A disabled button fires no events, so the tooltip hangs off
+                      a wrapper — otherwise the "why is this greyed out" hint
+                      never shows in the one case it matters. */}
+                  <span>{createButton}</span>
+                </TooltipTrigger>
+                <TooltipContent className="max-w-xs">
+                  端口已用满：{usage.port_lo}–{usage.port_hi} 共 {usage.capacity}{' '}
+                  个全部占用。删除不用的映射，或调大 config.yaml 的 port_range
+                  并同步部署的端口发布段。
+                </TooltipContent>
+              </Tooltip>
+            ) : (
+              createButton
+            )}
+          </>
         }
       />
 
@@ -251,6 +307,7 @@ export function MappingsPage() {
         onOpenChange={setDialogOpen}
         editing={editing}
         nodes={nodes}
+        usage={usage}
         onSaved={load}
       />
 

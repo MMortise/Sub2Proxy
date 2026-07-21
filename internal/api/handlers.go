@@ -107,6 +107,12 @@ func (s *Server) handleListMappings(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, s.app.Mappings())
 }
 
+// handleMappingPortRange reports the mapping-port bounds so the UI can show how
+// close it is to the ceiling. Static per process — clients fetch it once.
+func (s *Server) handleMappingPortRange(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, http.StatusOK, s.app.PortRange())
+}
+
 func (s *Server) handleCreateMapping(w http.ResponseWriter, r *http.Request) {
 	var in core.MappingInput
 	if !decode(w, r, &in) {

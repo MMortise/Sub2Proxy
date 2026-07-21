@@ -128,7 +128,12 @@ func (a *App) buildMapping(in MappingInput, excludePort int) (model.Mapping, err
 	if port == 0 {
 		p, err := mapping.AllocatePort(a.cfg.PortLo(), a.cfg.PortHi(), a.usedPorts(excludePort))
 		if err != nil {
-			return model.Mapping{}, conflict(err.Error())
+			// Stay factual here: core has no idea whether it runs under bridge
+			// Docker, host networking or systemd, so how to widen the range is
+			// the presentation layer's call.
+			return model.Mapping{}, conflict(fmt.Sprintf(
+				"port range [%d, %d] is full: all %d mapping ports are in use",
+				a.cfg.PortLo(), a.cfg.PortHi(), a.cfg.PortCapacity()))
 		}
 		port = p
 	} else if port != excludePort {
@@ -189,3 +194,25 @@ func (a *App) portOwner(port int) string {
 
 // Status returns the engine runtime status.
 func (a *App) Status() engine.Status { return a.engine.Status() }
+
+// PortRange is the mapping-port allocation range. Every mapping binds exactly
+// one port from it, so Capacity doubles as the ceiling on mapping count — which
+// is what lets a client warn before a create fails rather than after. Usage is
+// deliberately absent: it equals the mapping count the client already has, since
+// validation keeps every mapping port inside the range.
+type PortRange struct {
+	PortLo   int `json:"port_lo"`
+	PortHi   int `json:"port_hi"`
+	Capacity int `json:"capacity"`
+}
+
+// PortRange reports the configured mapping-port bounds.
+func (a *App) PortRange() PortRange {
+	a.mu.RLock()
+	defer a.mu.RUnlock()
+	return PortRange{
+		PortLo:   a.cfg.PortLo(),
+		PortHi:   a.cfg.PortHi(),
+		Capacity: a.cfg.PortCapacity(),
+	}
+}

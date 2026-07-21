@@ -1,12 +1,14 @@
 package core
 
 import (
+	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -74,23 +76,23 @@ func TestCreateMappingAutoAllocAndConflict(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if m1.Port != 27100 {
-		t.Fatalf("want auto-allocated 27100, got %d", m1.Port)
+	if m1.Port != 27001 {
+		t.Fatalf("want auto-allocated 27001, got %d", m1.Port)
 	}
 
-	// Second auto-alloc should get 27101.
+	// Second auto-alloc should get 27002.
 	n2, _ := a.AddManualNode(ssLink("us2"))
 	m2, err := a.CreateMapping(MappingInput{Name: "us-b", Strategy: model.StrategySingle,
 		Nodes: []model.NodeRef{{ID: n2.ID, Name: n2.Name}}})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if m2.Port != 27101 {
-		t.Fatalf("want 27101, got %d", m2.Port)
+	if m2.Port != 27002 {
+		t.Fatalf("want 27002, got %d", m2.Port)
 	}
 
 	// Explicit conflicting port -> 409 with owner name.
-	_, err = a.CreateMapping(MappingInput{Port: 27100, Name: "dup", Strategy: model.StrategySingle,
+	_, err = a.CreateMapping(MappingInput{Port: 27001, Name: "dup", Strategy: model.StrategySingle,
 		Nodes: []model.NodeRef{{ID: n.ID, Name: n.Name}}})
 	if err == nil || HTTPStatus(err) != http.StatusConflict {
 		t.Fatalf("want 409 conflict, got %v", err)
@@ -107,7 +109,7 @@ func TestCreateMappingAutoAllocAndConflict(t *testing.T) {
 func TestMappingDegradeDoesNotRewriteEnabled(t *testing.T) {
 	a := newTestApp(t)
 	n, _ := a.AddManualNode(ssLink("us1"))
-	_, err := a.CreateMapping(MappingInput{Port: 27100, Name: "us", Strategy: model.StrategySingle,
+	_, err := a.CreateMapping(MappingInput{Port: 27001, Name: "us", Strategy: model.StrategySingle,
 		Nodes: []model.NodeRef{{ID: n.ID, Name: n.Name}}})
 	if err != nil {
 		t.Fatal(err)
@@ -194,6 +196,50 @@ func TestConfigSnapshotExcludesRuntime(t *testing.T) {
 	snap.Subscriptions[0].Name = "changed"
 	if a.Subscriptions()[0].Name == "changed" {
 		t.Error("snapshot must be an independent copy")
+	}
+}
+
+// A two-port range makes the ceiling reachable in two creates, so this covers
+// both the reported bounds and the error the third create must produce.
+func TestPortRangeAndExhaustion(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "config.yaml")
+	os.WriteFile(path, []byte("auth_key: supersecret\nport_range: [27001, 27002]\ndata_dir: "+dir+"\n"), 0o600)
+	loaded, err := config.Load(path, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	loaded.DataDir = dir
+	a := New(loaded, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	t.Cleanup(a.Shutdown)
+
+	if r := a.PortRange(); r.PortLo != 27001 || r.PortHi != 27002 || r.Capacity != 2 {
+		t.Fatalf("port range = %+v, want 27001/27002/2", r)
+	}
+
+	for i := 1; i <= 2; i++ {
+		n, _ := a.AddManualNode(ssLink(fmt.Sprintf("cap%d", i)))
+		if _, err := a.CreateMapping(MappingInput{
+			Name: fmt.Sprintf("m%d", i), Strategy: model.StrategySingle,
+			Nodes: []model.NodeRef{{ID: n.ID, Name: n.Name}},
+		}); err != nil {
+			t.Fatalf("create %d: %v", i, err)
+		}
+	}
+
+	n, _ := a.AddManualNode(ssLink("cap-overflow"))
+	_, err = a.CreateMapping(MappingInput{
+		Name: "overflow", Strategy: model.StrategySingle,
+		Nodes: []model.NodeRef{{ID: n.ID, Name: n.Name}},
+	})
+	if err == nil {
+		t.Fatal("want an error once every port in range is taken")
+	}
+	if HTTPStatus(err) != http.StatusConflict {
+		t.Errorf("want 409, got %d", HTTPStatus(err))
+	}
+	if !strings.Contains(err.Error(), "[27001, 27002]") {
+		t.Errorf("error should name the exhausted range, got %q", err.Error())
 	}
 }
 

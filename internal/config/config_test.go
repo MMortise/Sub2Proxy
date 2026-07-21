@@ -1,6 +1,8 @@
 package config
 
 import (
+	"fmt"
+	"net"
 	"os"
 	"path/filepath"
 	"strings"
@@ -10,6 +12,33 @@ import (
 
 	"github.com/wuxi/sub2proxy/internal/model"
 )
+
+// The mapping range has to be repeated in compose files and Dockerfiles, which
+// no Go code can read at runtime — so nothing but this check keeps them aligned
+// with the constants. Without it, changing the range half-lands silently and the
+// app hands out ports the container never published.
+func TestDeployFilesMatchDefaultPortRange(t *testing.T) {
+	_, listenPort, err := net.SplitHostPort(DefaultListen)
+	if err != nil {
+		t.Fatalf("DefaultListen %q is not host:port: %v", DefaultListen, err)
+	}
+	rng := fmt.Sprintf("%d-%d", DefaultPortLo, DefaultPortHi)
+
+	for _, tc := range []struct{ file, want string }{
+		{"docker-compose.yml", fmt.Sprintf("%q", rng+":"+rng)},
+		{"docker-compose.release.yml", fmt.Sprintf("- %q", rng)},
+		{"Dockerfile", "EXPOSE " + listenPort + " " + rng},
+		{"Dockerfile.release", "EXPOSE " + listenPort + " " + rng},
+	} {
+		body, err := os.ReadFile(filepath.Join("..", "..", tc.file))
+		if err != nil {
+			t.Fatalf("read %s: %v", tc.file, err)
+		}
+		if !strings.Contains(string(body), tc.want) {
+			t.Errorf("%s must publish the default range: expected to find %q", tc.file, tc.want)
+		}
+	}
+}
 
 func writeConfig(t *testing.T, body string) string {
 	t.Helper()
@@ -55,6 +84,15 @@ func TestLoadMissingGeneratesKeyAndStarts(t *testing.T) {
 	}
 	if info.Mode().Perm() != FileMode {
 		t.Errorf("template mode = %v, want %v", info.Mode().Perm(), os.FileMode(FileMode))
+	}
+	// The template interpolates the Default* constants, so reading it back must
+	// reproduce them — otherwise a seeded config quietly disagrees with the code.
+	if cfg.PortRange != [2]int{DefaultPortLo, DefaultPortHi} {
+		t.Errorf("template port_range = %v, want [%d %d]", cfg.PortRange, DefaultPortLo, DefaultPortHi)
+	}
+	if cfg.Listen != DefaultListen || cfg.DataDir != DefaultDataDir {
+		t.Errorf("template listen/data_dir = %q/%q, want %q/%q",
+			cfg.Listen, cfg.DataDir, DefaultListen, DefaultDataDir)
 	}
 	// The generated key is surfaced and persisted for a stable restart.
 	found := false

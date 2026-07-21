@@ -58,6 +58,7 @@ func (s *Server) Handler() http.Handler {
 
 	// Mappings.
 	mux.HandleFunc("GET /api/mappings", s.requireAuth(s.handleListMappings))
+	mux.HandleFunc("GET /api/mappings/port-range", s.requireAuth(s.handleMappingPortRange))
 	mux.HandleFunc("POST /api/mappings", s.requireAuth(s.handleCreateMapping))
 	mux.HandleFunc("PUT /api/mappings/{port}", s.requireAuth(s.handleUpdateMapping))
 	mux.HandleFunc("DELETE /api/mappings/{port}", s.requireAuth(s.handleDeleteMapping))

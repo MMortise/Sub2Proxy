@@ -12,6 +12,7 @@ import {
   type MappingInput,
   type Node,
   type NodeRef,
+  type PortUsage,
   type Strategy,
   type Subscription,
 } from '@/lib/types'
@@ -45,13 +46,21 @@ interface MappingDialogProps {
   onOpenChange: (open: boolean) => void
   editing: Mapping | null
   nodes: Node[]
+  usage: PortUsage | null
   onSaved: () => void
 }
 
 const DEFAULT_HC_URL = 'http://www.gstatic.com/generate_204'
 const DEFAULT_HC_INTERVAL = 300
 
-export function MappingDialog({ open, onOpenChange, editing, nodes, onSaved }: MappingDialogProps) {
+export function MappingDialog({
+  open,
+  onOpenChange,
+  editing,
+  nodes,
+  usage,
+  onSaved,
+}: MappingDialogProps) {
   const [name, setName] = useState('')
   const [port, setPort] = useState('')
   const [strategy, setStrategy] = useState<Strategy>('single')
@@ -229,6 +238,22 @@ export function MappingDialog({ open, onOpenChange, editing, nodes, onSaved }: M
                 placeholder="留空自动分配"
                 inputMode="numeric"
               />
+              {usage && (
+                <p
+                  className={cn(
+                    'text-xs',
+                    usage.free <= 0 && !editing
+                      ? 'text-destructive'
+                      : 'text-muted-foreground',
+                  )}
+                >
+                  可用范围 {usage.port_lo}–{usage.port_hi}
+                  {!editing &&
+                    (usage.free > 0
+                      ? `，剩余 ${usage.free}/${usage.capacity} 个`
+                      : '，已全部占用')}
+                </p>
+              )}
             </div>
           </div>
 

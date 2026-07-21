@@ -56,7 +56,7 @@ if [ ! -f "$PREFIX/data/config.yaml" ]; then
   cat > "$PREFIX/data/config.yaml" <<EOF
 listen: 0.0.0.0:27000
 auth_key: ""
-port_range: [27100, 27199]
+port_range: [27001, 27020]
 data_dir: ${PREFIX}/data
 subscriptions: []
 manual_nodes: []

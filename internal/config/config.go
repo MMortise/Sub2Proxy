@@ -19,8 +19,8 @@ import (
 const (
 	DefaultListen  = "0.0.0.0:27000"
 	DefaultDataDir = "/data"
-	DefaultPortLo  = 27100
-	DefaultPortHi  = 27199
+	DefaultPortLo  = 27001
+	DefaultPortHi  = 27020
 	FileMode       = 0o600
 )
 
@@ -40,6 +40,10 @@ type Config struct {
 // PortLo and PortHi expose the mapping port range bounds.
 func (c *Config) PortLo() int { return c.PortRange[0] }
 func (c *Config) PortHi() int { return c.PortRange[1] }
+
+// PortCapacity is how many mapping ports the range holds. Every mapping binds
+// exactly one of them, so this is also the ceiling on mapping count.
+func (c *Config) PortCapacity() int { return c.PortHi() - c.PortLo() + 1 }
 func (c *Config) Path() string { return c.path }
 
 // applyDefaults fills zero-valued optional fields.
@@ -156,15 +160,18 @@ func warnf(warn func(string), format string, args ...any) {
 	}
 }
 
+// templateWithKey fills the template from the Default* constants above, so the
+// seeded config and the in-code defaults cannot drift apart.
 func templateWithKey(key string) string {
-	return fmt.Sprintf(templateYAML, key)
+	return fmt.Sprintf(templateYAML, DefaultListen, key, DefaultPortLo, DefaultPortHi,
+		DefaultPortHi-DefaultPortLo+1, DefaultDataDir)
 }
 
 const templateYAML = `# sub2proxy configuration. See README for full field docs.
-listen: 0.0.0.0:27000          # Web UI / API listen address
+listen: %s          # Web UI / API listen address
 auth_key: "%s"                 # login key for UI and API (>= 8 chars). Auto-generated on first run; change to set your own.
-port_range: [27100, 27199]     # mapping port allocation range (100 ports; match compose published range)
-data_dir: /data                # derived data (node cache) directory
+port_range: [%d, %d]     # mapping port allocation range (%d ports; match compose published range)
+data_dir: %s                # derived data (node cache) directory
 
 subscriptions: []              # added via the web UI
 manual_nodes: []               # raw share links added manually

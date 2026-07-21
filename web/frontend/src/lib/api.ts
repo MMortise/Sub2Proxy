@@ -3,6 +3,7 @@ import type {
   Mapping,
   MappingInput,
   Node,
+  PortRange,
   Status,
   Subscription,
   SubscriptionInput,
@@ -119,6 +120,7 @@ export const api = {
 
   // --- mappings ---
   listMappings: () => request<Mapping[]>('/api/mappings'),
+  mappingPortRange: () => request<PortRange>('/api/mappings/port-range'),
   createMapping: (input: MappingInput) =>
     request<Mapping>('/api/mappings', { method: 'POST', body: input }),
   updateMapping: (port: number, input: MappingInput) =>

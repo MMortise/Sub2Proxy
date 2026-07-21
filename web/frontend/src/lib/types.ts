@@ -63,6 +63,22 @@ export type Mapping = {
   password?: string
 }
 
+// PortRange mirrors GET /api/mappings/port-range. It comes from config and
+// cannot change while the app runs, so clients fetch it once.
+export type PortRange = {
+  port_lo: number
+  port_hi: number
+  capacity: number
+}
+
+// PortUsage folds the client-side counts into the range. The server validates
+// that every mapping port sits inside the range, so the number of mappings on
+// hand is the number of ports taken — no request needed to learn it.
+export type PortUsage = PortRange & {
+  used: number
+  free: number
+}
+
 export type MappingStatus = {
   port: number
   active_node: string

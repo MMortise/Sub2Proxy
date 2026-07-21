@@ -2,14 +2,19 @@
 #
 # Ports:
 #   27000       Web UI / API
-#   27100-27199 proxy mapping ports (100 ports; each mapping binds one)
+#   27001-27020 proxy mapping ports (20 ports; each mapping binds one)
+#
+# The published range must match `port_range` in config.yaml — the app allocates
+# mapping ports from that range, and anything it hands out that isn't published
+# here is unreachable from the host. Grow them together; a test in
+# internal/config fails if they drift. Bridge mode starts one docker-proxy per
+# published port, so a wide range noticeably slows startup — hence only 20.
 #
 # Published on all interfaces so the LAN can reach the Web UI and proxy ports.
 # Note: the Web UI (27000) is protected by the login key, but a proxy port
-# (27100-27199) is only protected if you set a username/password on that mapping —
+# (27001-27020) is only protected if you set a username/password on that mapping —
 # otherwise anyone on the LAN can use it. To restrict to this host only, prefix
-# both mappings with 127.0.0.1. If you grow the range, keep the published ports
-# and `port_range` in config.yaml in sync.
+# both mappings with 127.0.0.1.
 services:
   sub2proxy:
     build: .
@@ -18,7 +23,7 @@ services:
     restart: unless-stopped
     ports:
       - "27000:27000"
-      - "27100-27199:27100-27199"
+      - "27001-27020:27001-27020"
     volumes:
       # Single data volume: config.yaml (source of truth) + nodes.json cache live
       # here. On first run the app writes a config.yaml template into ./data;

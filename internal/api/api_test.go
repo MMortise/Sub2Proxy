@@ -336,8 +336,8 @@ func TestMappingCRUDAndNoSideEffectOnFailure(t *testing.T) {
 	}
 	var m struct{ Port int }
 	json.Unmarshal(rec.Body.Bytes(), &m)
-	if m.Port != 27100 {
-		t.Fatalf("want auto-allocated 27100, got %d", m.Port)
+	if m.Port != 27001 {
+		t.Fatalf("want auto-allocated 27001, got %d", m.Port)
 	}
 
 	// Out-of-range port -> 400, and NO side effect (still 1 mapping).
@@ -352,7 +352,7 @@ func TestMappingCRUDAndNoSideEffectOnFailure(t *testing.T) {
 	}
 
 	// Disable then check it reflects.
-	rec = do(t, h, "POST", "/api/mappings/27100/disable", nil, true)
+	rec = do(t, h, "POST", "/api/mappings/27001/disable", nil, true)
 	if rec.Code != http.StatusOK {
 		t.Fatalf("disable = %d", rec.Code)
 	}
@@ -361,8 +361,8 @@ func TestMappingCRUDAndNoSideEffectOnFailure(t *testing.T) {
 	}
 
 	// Update (rename).
-	rec = do(t, h, "PUT", "/api/mappings/27100", map[string]any{
-		"port": 27100, "name": "us-renamed", "strategy": "single",
+	rec = do(t, h, "PUT", "/api/mappings/27001", map[string]any{
+		"port": 27001, "name": "us-renamed", "strategy": "single",
 		"nodes": []map[string]string{{"id": node.ID, "name": node.Name}}, "enabled": true,
 	}, true)
 	if rec.Code != http.StatusOK {
@@ -370,7 +370,7 @@ func TestMappingCRUDAndNoSideEffectOnFailure(t *testing.T) {
 	}
 
 	// Delete.
-	rec = do(t, h, "DELETE", "/api/mappings/27100", nil, true)
+	rec = do(t, h, "DELETE", "/api/mappings/27001", nil, true)
 	if rec.Code != http.StatusOK {
 		t.Fatalf("delete = %d", rec.Code)
 	}
