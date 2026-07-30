@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -28,7 +29,7 @@ type Result struct {
 }
 
 // Fetcher retrieves and parses subscriptions. It holds a single http.Client so
-// connections are reused across refreshes.
+// connections are reused across direct (no fetch_proxy) refreshes.
 type Fetcher struct {
 	client *http.Client
 }
@@ -36,21 +37,45 @@ type Fetcher struct {
 // NewFetcher builds a Fetcher with the fetch timeout and redirect cap applied.
 func NewFetcher() *Fetcher {
 	return &Fetcher{
-		client: &http.Client{
-			Timeout: FetchTimeout,
-			CheckRedirect: func(req *http.Request, via []*http.Request) error {
-				if len(via) >= MaxRedirects {
-					return fmt.Errorf("stopped after %d redirects", MaxRedirects)
-				}
-				return nil
-			},
+		client: newFetchClient(nil),
+	}
+}
+
+// newFetchClient builds an http.Client with the standard fetch limits. When
+// proxyURL is non-nil, requests go through that HTTP(S) proxy.
+func newFetchClient(proxyURL *url.URL) *http.Client {
+	c := &http.Client{
+		Timeout: FetchTimeout,
+		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+			if len(via) >= MaxRedirects {
+				return fmt.Errorf("stopped after %d redirects", MaxRedirects)
+			}
+			return nil
 		},
 	}
+	if proxyURL != nil {
+		c.Transport = &http.Transport{Proxy: http.ProxyURL(proxyURL)}
+	}
+	return c
+}
+
+// clientFor returns the shared direct client, or a one-shot client that uses
+// sub.FetchProxy when configured (design D3: low-frequency path, no cache).
+func (f *Fetcher) clientFor(sub model.Subscription) (*http.Client, error) {
+	if sub.FetchProxy == "" {
+		return f.client, nil
+	}
+	u, err := url.Parse(sub.FetchProxy)
+	if err != nil {
+		return nil, fmt.Errorf("fetch_proxy: %w", err)
+	}
+	return newFetchClient(u), nil
 }
 
 // Fetch retrieves the subscription, enforces the size cap, parses both formats,
 // and extracts quota info. Network, size, and parse failures all return an error
-// so the caller can preserve the previous node set.
+// so the caller can preserve the previous node set. When sub.FetchProxy is set,
+// the GET goes through that HTTP(S) proxy.
 func (f *Fetcher) Fetch(ctx context.Context, sub model.Subscription) (*Result, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, sub.URL, nil)
 	if err != nil {
@@ -58,7 +83,11 @@ func (f *Fetcher) Fetch(ctx context.Context, sub model.Subscription) (*Result, e
 	}
 	req.Header.Set("User-Agent", sub.UserAgentOrDefault())
 
-	resp, err := f.client.Do(req)
+	client, err := f.clientFor(sub)
+	if err != nil {
+		return nil, err
+	}
+	resp, err := client.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("fetch: %w", err)
 	}

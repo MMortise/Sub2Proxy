@@ -43,6 +43,9 @@ func (c *Config) Validate() error {
 		if err := model.ValidateRefreshInterval(s.RefreshInterval); err != nil {
 			return fmt.Errorf("subscriptions[%s].refresh_interval: %v", subLabel(s, i), err)
 		}
+		if err := model.ValidateFetchProxy(s.FetchProxy); err != nil {
+			return fmt.Errorf("subscriptions[%s].fetch_proxy: %v", subLabel(s, i), err)
+		}
 	}
 	return nil
 }

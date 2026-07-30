@@ -13,6 +13,8 @@ export type Subscription = {
   url: string
   user_agent?: string
   refresh_interval?: string
+  /** Optional HTTP(S) proxy used only when pulling this subscription. */
+  fetch_proxy?: string
   node_count: number
   last_refresh?: string
   last_error?: string
@@ -106,6 +108,8 @@ export type SubscriptionInput = {
   url: string
   user_agent?: string
   refresh_interval?: string
+  /** Optional HTTP(S) proxy for subscription pull only. */
+  fetch_proxy?: string
 }
 
 export type MappingInput = {

@@ -3,6 +3,7 @@ package subscribe
 import (
 	"context"
 	"encoding/base64"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -171,6 +172,81 @@ func TestFetchTimeout(t *testing.T) {
 	_, err := NewFetcher().Fetch(ctx, model.Subscription{URL: srv.URL})
 	if err == nil {
 		t.Fatal("want timeout error")
+	}
+}
+
+// startForwardProxy runs a minimal absolute-URI HTTP forward proxy for GET.
+func startForwardProxy(t *testing.T) string {
+	t.Helper()
+	proxy := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			http.Error(w, "method", http.StatusMethodNotAllowed)
+			return
+		}
+		// Client sends absolute-form RequestURI when using an HTTP proxy.
+		out, err := http.Get(r.RequestURI)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadGateway)
+			return
+		}
+		defer out.Body.Close()
+		for k, vv := range out.Header {
+			for _, v := range vv {
+				w.Header().Add(k, v)
+			}
+		}
+		w.WriteHeader(out.StatusCode)
+		_, _ = io.Copy(w, out.Body)
+	}))
+	t.Cleanup(proxy.Close)
+	return proxy.URL
+}
+
+func TestFetchViaHTTPProxy(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte("proxies:\n  - {name: SS-1, type: ss, server: 1.2.3.4, port: 8388, cipher: aes-256-gcm, password: secret}\n"))
+	}))
+	defer upstream.Close()
+	proxyURL := startForwardProxy(t)
+
+	res, err := NewFetcher().Fetch(context.Background(), model.Subscription{
+		URL:        upstream.URL,
+		FetchProxy: proxyURL,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(res.Proxies) != 1 {
+		t.Fatalf("want 1 proxy via fetch_proxy, got %d", len(res.Proxies))
+	}
+}
+
+func TestFetchProxyUnreachable(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte(vlessLink))
+	}))
+	defer upstream.Close()
+
+	_, err := NewFetcher().Fetch(context.Background(), model.Subscription{
+		URL:        upstream.URL,
+		FetchProxy: "http://127.0.0.1:1", // nothing listening
+	})
+	if err == nil {
+		t.Fatal("want error when fetch_proxy is unreachable")
+	}
+}
+
+func TestFetchDirectStillWorks(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte(vlessLink))
+	}))
+	defer srv.Close()
+	res, err := NewFetcher().Fetch(context.Background(), model.Subscription{URL: srv.URL})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(res.Proxies) != 1 {
+		t.Fatalf("direct fetch regression: want 1, got %d", len(res.Proxies))
 	}
 }
 

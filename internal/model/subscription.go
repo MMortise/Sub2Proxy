@@ -2,6 +2,7 @@ package model
 
 import (
 	"fmt"
+	"net/url"
 	"time"
 )
 
@@ -14,6 +15,10 @@ type Subscription struct {
 	URL             string `yaml:"url" json:"url"`
 	UserAgent       string `yaml:"user_agent,omitempty" json:"user_agent,omitempty"`
 	RefreshInterval string `yaml:"refresh_interval,omitempty" json:"refresh_interval,omitempty"` // e.g. "6h"
+	// FetchProxy is an optional HTTP(S) proxy URL used only when pulling this
+	// subscription (control plane). Empty means direct. Not used for data-plane
+	// node traffic.
+	FetchProxy string `yaml:"fetch_proxy,omitempty" json:"fetch_proxy,omitempty"`
 
 	// Runtime-only fields.
 	NodeCount   int       `yaml:"-" json:"node_count"`
@@ -59,6 +64,20 @@ func ValidateRefreshInterval(interval string) error {
 	}
 	if d < MinRefreshInterval || d > MaxRefreshInterval {
 		return fmt.Errorf("must be within 5m–24h, got %s", d)
+	}
+	return nil
+}
+
+// ValidateFetchProxy checks an optional HTTP(S) proxy URL used only for
+// subscription pulls. Empty is allowed (direct). Non-empty values MUST use the
+// http or https scheme and include a host (SOCKS and other schemes are rejected).
+func ValidateFetchProxy(proxy string) error {
+	if proxy == "" {
+		return nil
+	}
+	u, err := url.Parse(proxy)
+	if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
+		return fmt.Errorf("must be a valid http(s) proxy URL (SOCKS not supported)")
 	}
 	return nil
 }

@@ -62,3 +62,28 @@ func TestStrategyValid(t *testing.T) {
 		t.Error("bogus should be invalid")
 	}
 }
+
+func TestValidateFetchProxy(t *testing.T) {
+	if err := ValidateFetchProxy(""); err != nil {
+		t.Fatalf("empty should be ok: %v", err)
+	}
+	if err := ValidateFetchProxy("http://127.0.0.1:7890"); err != nil {
+		t.Fatalf("http proxy should be ok: %v", err)
+	}
+	if err := ValidateFetchProxy("https://proxy.example:8443"); err != nil {
+		t.Fatalf("https proxy should be ok: %v", err)
+	}
+	if err := ValidateFetchProxy("http://user:pass@127.0.0.1:7890"); err != nil {
+		t.Fatalf("userinfo should be ok: %v", err)
+	}
+	for _, bad := range []string{
+		"socks5://127.0.0.1:1080",
+		"ftp://127.0.0.1:21",
+		"not-a-url",
+		"http://",
+	} {
+		if err := ValidateFetchProxy(bad); err == nil {
+			t.Errorf("want error for %q", bad)
+		}
+	}
+}

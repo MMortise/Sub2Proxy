@@ -18,6 +18,7 @@ type SubscriptionInput struct {
 	URL             string `json:"url"`
 	UserAgent       string `json:"user_agent"`
 	RefreshInterval string `json:"refresh_interval"`
+	FetchProxy      string `json:"fetch_proxy"`
 }
 
 // Subscriptions returns a copy of all subscriptions with runtime status. The
@@ -45,6 +46,7 @@ func (a *App) AddSubscription(in SubscriptionInput) (model.Subscription, int, er
 	sub := model.Subscription{
 		ID: genID(), Name: in.Name, URL: in.URL,
 		UserAgent: in.UserAgent, RefreshInterval: in.RefreshInterval,
+		FetchProxy: strings.TrimSpace(in.FetchProxy),
 	}
 	a.cfg.Subscriptions = append(a.cfg.Subscriptions, sub)
 	a.mu.Unlock()
@@ -75,6 +77,7 @@ func (a *App) UpdateSubscription(id string, in SubscriptionInput) (model.Subscri
 	}
 	s := &a.cfg.Subscriptions[idx]
 	s.Name, s.URL, s.UserAgent, s.RefreshInterval = in.Name, in.URL, in.UserAgent, in.RefreshInterval
+	s.FetchProxy = strings.TrimSpace(in.FetchProxy)
 	a.mu.Unlock()
 
 	a.store.Schedule()
@@ -269,6 +272,9 @@ func validateSubInput(in SubscriptionInput) error {
 	}
 	if err := model.ValidateRefreshInterval(in.RefreshInterval); err != nil {
 		return badRequest("refresh_interval: " + err.Error())
+	}
+	if err := model.ValidateFetchProxy(strings.TrimSpace(in.FetchProxy)); err != nil {
+		return badRequest("fetch_proxy: " + err.Error())
 	}
 	return nil
 }

@@ -111,6 +111,7 @@ subscriptions:                   # 一般通过 UI 添加，也可手写
     url: https://example.com/sub?token=xxx
     user_agent: clash.meta       # 可选，默认 clash.meta（机场按 UA 返回不同格式）
     refresh_interval: 6h         # 可选，默认 6h，范围 5m–24h
+    fetch_proxy: http://127.0.0.1:7890  # 可选，仅拉取本订阅时走的 HTTP 代理；空=直连；不支持 SOCKS
 
 manual_nodes:                    # 手动添加的节点（原始分享链接）
   - "vless://uuid@host:443?security=tls&sni=example.com&type=ws#我的自建"

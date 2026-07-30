@@ -185,6 +185,64 @@ func TestSubscriptionAddRefreshAndFailure(t *testing.T) {
 	}
 }
 
+func TestSubscriptionFetchProxy(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte("proxies:\n  - {name: Via-P, type: ss, server: 6.6.6.6, port: 8388, cipher: aes-256-gcm, password: secret}\n"))
+	}))
+	defer upstream.Close()
+
+	// Absolute-URI forward proxy (same shape Go uses for http targets via HTTP proxy).
+	proxy := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		out, err := http.Get(r.RequestURI)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadGateway)
+			return
+		}
+		defer out.Body.Close()
+		w.WriteHeader(out.StatusCode)
+		io.Copy(w, out.Body)
+	}))
+	defer proxy.Close()
+
+	a := newTestApp(t)
+
+	// Invalid fetch_proxy -> 400.
+	if _, _, err := a.AddSubscription(SubscriptionInput{
+		Name: "bad", URL: upstream.URL, FetchProxy: "socks5://127.0.0.1:1080",
+	}); err == nil || HTTPStatus(err) != http.StatusBadRequest {
+		t.Fatalf("want 400 for socks fetch_proxy, got %v", err)
+	}
+
+	sub, count, err := a.AddSubscription(SubscriptionInput{
+		Name: "via-proxy", URL: upstream.URL, FetchProxy: proxy.URL,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if count != 1 {
+		t.Fatalf("want 1 node via fetch_proxy, got %d", count)
+	}
+	if got := a.Subscriptions()[0].FetchProxy; got != proxy.URL {
+		t.Fatalf("list should echo fetch_proxy, got %q", got)
+	}
+
+	// Point fetch_proxy at a dead port; refresh fails but nodes stay.
+	if _, err := a.UpdateSubscription(sub.ID, SubscriptionInput{
+		Name: "via-proxy", URL: upstream.URL, FetchProxy: "http://127.0.0.1:1",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := a.RefreshSubscription(sub.ID); err == nil {
+		t.Fatal("want refresh error when fetch_proxy is dead")
+	}
+	if len(a.Nodes("")) != 1 {
+		t.Fatal("failed proxy refresh must preserve nodes")
+	}
+	if a.Subscriptions()[0].LastError == "" {
+		t.Error("want last_error after dead fetch_proxy")
+	}
+}
+
 func TestConfigSnapshotExcludesRuntime(t *testing.T) {
 	a := newTestApp(t)
 	a.mu.Lock()

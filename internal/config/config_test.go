@@ -10,6 +10,8 @@ import (
 	"testing"
 	"time"
 
+	"gopkg.in/yaml.v3"
+
 	"github.com/wuxi/sub2proxy/internal/model"
 )
 
@@ -64,6 +66,42 @@ func TestLoadDefaults(t *testing.T) {
 	}
 	if cfg.PortRange != [2]int{DefaultPortLo, DefaultPortHi} {
 		t.Errorf("port_range default = %v", cfg.PortRange)
+	}
+}
+
+func TestLoadFetchProxyRoundTrip(t *testing.T) {
+	path := writeConfig(t, `auth_key: supersecret
+subscriptions:
+  - id: abcd1234
+    name: air
+    url: https://example.com/sub
+    fetch_proxy: http://127.0.0.1:7890
+`)
+	cfg, err := Load(path, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(cfg.Subscriptions) != 1 {
+		t.Fatalf("want 1 sub, got %d", len(cfg.Subscriptions))
+	}
+	if cfg.Subscriptions[0].FetchProxy != "http://127.0.0.1:7890" {
+		t.Fatalf("fetch_proxy = %q", cfg.Subscriptions[0].FetchProxy)
+	}
+	// Marshal back and reload so omitempty + yaml tags preserve the field.
+	data, err := yaml.Marshal(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	path2 := filepath.Join(t.TempDir(), "config.yaml")
+	if err := os.WriteFile(path2, data, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	cfg2, err := Load(path2, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg2.Subscriptions[0].FetchProxy != "http://127.0.0.1:7890" {
+		t.Fatalf("round-trip fetch_proxy = %q", cfg2.Subscriptions[0].FetchProxy)
 	}
 }
 
@@ -218,6 +256,12 @@ func TestValidate(t *testing.T) {
 		}, "refresh_interval"},
 		{"refresh interval ok", func(c *Config) {
 			c.Subscriptions = []model.Subscription{{Name: "a", URL: "http://x", RefreshInterval: "6h"}}
+		}, ""},
+		{"fetch_proxy socks rejected", func(c *Config) {
+			c.Subscriptions = []model.Subscription{{Name: "a", URL: "http://x", FetchProxy: "socks5://127.0.0.1:1080"}}
+		}, "fetch_proxy"},
+		{"fetch_proxy http ok", func(c *Config) {
+			c.Subscriptions = []model.Subscription{{Name: "a", URL: "http://x", FetchProxy: "http://127.0.0.1:7890"}}
 		}, ""},
 	}
 	for _, tc := range cases {

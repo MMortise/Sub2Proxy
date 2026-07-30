@@ -253,8 +253,11 @@ func TestSubscriptionCRUD(t *testing.T) {
 		t.Fatalf("create subscription = %d: %s", rec.Code, rec.Body)
 	}
 	var created struct {
-		Subscription struct{ ID string } `json:"subscription"`
-		NodeCount    int                 `json:"node_count"`
+		Subscription struct {
+			ID         string `json:"id"`
+			FetchProxy string `json:"fetch_proxy"`
+		} `json:"subscription"`
+		NodeCount int `json:"node_count"`
 	}
 	json.Unmarshal(rec.Body.Bytes(), &created)
 	if created.NodeCount != 1 {
@@ -267,6 +270,14 @@ func TestSubscriptionCRUD(t *testing.T) {
 		t.Fatalf("duplicate URL should be 409, got %d", rec.Code)
 	}
 
+	// Illegal fetch_proxy -> 400.
+	rec = do(t, h, "POST", "/api/subscriptions", map[string]string{
+		"name": "socks", "url": upstream.URL + "/other", "fetch_proxy": "socks5://127.0.0.1:1080",
+	}, true)
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("socks fetch_proxy should be 400, got %d: %s", rec.Code, rec.Body)
+	}
+
 	// Refresh.
 	rec = do(t, h, "POST", "/api/subscriptions/"+created.Subscription.ID+"/refresh", nil, true)
 	if rec.Code != http.StatusOK {
@@ -277,6 +288,54 @@ func TestSubscriptionCRUD(t *testing.T) {
 	rec = do(t, h, "DELETE", "/api/subscriptions/"+created.Subscription.ID, nil, true)
 	if rec.Code != http.StatusOK {
 		t.Fatalf("delete = %d", rec.Code)
+	}
+}
+
+func TestSubscriptionCreateWithFetchProxy(t *testing.T) {
+	s, _ := newTestServer(t)
+	h := s.Handler()
+
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte("proxies:\n  - {name: N2, type: ss, server: 2.2.2.2, port: 8388, cipher: aes-256-gcm, password: secret}\n"))
+	}))
+	defer upstream.Close()
+	proxy := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		out, err := http.Get(r.RequestURI)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadGateway)
+			return
+		}
+		defer out.Body.Close()
+		w.WriteHeader(out.StatusCode)
+		io.Copy(w, out.Body)
+	}))
+	defer proxy.Close()
+
+	rec := do(t, h, "POST", "/api/subscriptions", map[string]string{
+		"name": "air-p", "url": upstream.URL, "fetch_proxy": proxy.URL,
+	}, true)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("create with fetch_proxy = %d: %s", rec.Code, rec.Body)
+	}
+	var created struct {
+		Subscription struct {
+			ID         string `json:"id"`
+			FetchProxy string `json:"fetch_proxy"`
+		} `json:"subscription"`
+		NodeCount int `json:"node_count"`
+	}
+	json.Unmarshal(rec.Body.Bytes(), &created)
+	if created.NodeCount != 1 || created.Subscription.FetchProxy != proxy.URL {
+		t.Fatalf("got node_count=%d fetch_proxy=%q", created.NodeCount, created.Subscription.FetchProxy)
+	}
+
+	// List echoes fetch_proxy.
+	rec = do(t, h, "GET", "/api/subscriptions", nil, true)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("list = %d", rec.Code)
+	}
+	if !strings.Contains(rec.Body.String(), proxy.URL) {
+		t.Fatalf("list body should include fetch_proxy URL, got %s", rec.Body)
 	}
 }
 

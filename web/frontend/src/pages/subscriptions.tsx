@@ -75,6 +75,7 @@ function SubscriptionDialog({
     url: '',
     user_agent: '',
     refresh_interval: '',
+    fetch_proxy: '',
   })
   const [saving, setSaving] = useState(false)
 
@@ -85,6 +86,7 @@ function SubscriptionDialog({
         url: editing?.url ?? '',
         user_agent: editing?.user_agent ?? '',
         refresh_interval: editing?.refresh_interval ?? '',
+        fetch_proxy: editing?.fetch_proxy ?? '',
       })
     }
   }, [state.open, editing])
@@ -96,6 +98,7 @@ function SubscriptionDialog({
       url: form.url.trim(),
       user_agent: form.user_agent?.trim() || undefined,
       refresh_interval: form.refresh_interval?.trim() || undefined,
+      fetch_proxy: form.fetch_proxy?.trim() || undefined,
     }
     setSaving(true)
     try {
@@ -163,6 +166,18 @@ function SubscriptionDialog({
             />
             <p className="text-xs text-muted-foreground">
               形如 30m、6h、24h，范围 5m–24h，留空默认 6h
+            </p>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="sub-fetch-proxy">拉取代理（可选）</Label>
+            <Input
+              id="sub-fetch-proxy"
+              value={form.fetch_proxy}
+              onChange={(e) => setForm((f) => ({ ...f, fetch_proxy: e.target.value }))}
+              placeholder="http://127.0.0.1:7890"
+            />
+            <p className="text-xs text-muted-foreground">
+              仅用于拉取本订阅的 HTTP 代理，留空直连；不支持 SOCKS
             </p>
           </div>
           <DialogFooter>
