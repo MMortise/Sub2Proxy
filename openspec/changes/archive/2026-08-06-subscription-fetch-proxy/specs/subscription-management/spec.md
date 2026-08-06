@@ -1,8 +1,5 @@
-# subscription-management Specification
+## MODIFIED Requirements
 
-## Purpose
-TBD - created by archiving change build-sub2proxy-mvp. Update Purpose after archive.
-## Requirements
 ### Requirement: 订阅的增删改
 系统 SHALL 支持添加、编辑、删除订阅。每条订阅字段：`id`（创建时生成的 8 字符随机串，持久不变）、`name`（必填）、`url`（必填，必须为 http/https）、`user_agent`（可选，默认 `clash.meta`）、`refresh_interval`（可选，默认 6h，允许范围 5m–24h）、`fetch_proxy`（可选，HTTP/HTTPS 代理 URL，仅用于拉取该订阅；空表示直连）。与既有订阅 URL 完全相同的添加请求 SHALL 被拒绝（409）。非空的 `fetch_proxy` SHALL 校验为合法 http/https URL 且含 host，否则返回 400。变更 SHALL 持久化到 config.yaml。
 
@@ -56,30 +53,3 @@ TBD - created by archiving change build-sub2proxy-mvp. Update Purpose after arch
 #### Scenario: 拉取代理不可达
 - **WHEN** 订阅配置了 `fetch_proxy` 但代理连接失败或超时
 - **THEN** 拉取判定失败并记录原因，现有节点池不变
-
-### Requirement: 定时刷新
-系统 SHALL 按每条订阅的 `refresh_interval` 自动拉取（每订阅独立计时，自上次成功或失败时刻起算），并支持手动立即刷新（同步返回结果）。刷新成功 SHALL 记录刷新时间并按指纹增量更新节点池；刷新失败 SHALL 保留上次成功的节点数据、记录失败原因与时间，并在下个周期重试。
-
-#### Scenario: 自动刷新成功
-- **WHEN** 刷新间隔到期且拉取成功
-- **THEN** 节点池按指纹增量更新（新增入池、消失移除、指纹相同保留），订阅记录本次刷新时间与节点数
-
-#### Scenario: 刷新失败不破坏现状
-- **WHEN** 定时拉取网络失败或解析失败
-- **THEN** 现有节点池不变，订阅标记错误状态与原因（UI 可见），下个周期自动重试
-
-#### Scenario: 手动刷新
-- **WHEN** 用户点击某订阅的手动刷新
-- **THEN** 立即执行拉取并同步返回成功（节点数）或失败（原因），重置该订阅的下次自动刷新计时
-
-### Requirement: 配额信息展示
-系统 SHALL 解析订阅响应的 `subscription-userinfo` 头（分号分隔的 `upload=` `download=` `total=`（字节）与 `expire=`（Unix 秒），字段允许部分缺失），持久化到该订阅并在 UI 展示已用流量比例与到期日期；头缺失时不展示配额区。
-
-#### Scenario: 含配额头的订阅
-- **WHEN** 拉取响应带 `subscription-userinfo: upload=123; download=456; total=1073741824; expire=1735689600`
-- **THEN** 订阅列表展示已用 (upload+download)/total 进度与到期日期
-
-#### Scenario: 配额头部分缺失
-- **WHEN** 头只含 `total` 与 `expire`，无 upload/download
-- **THEN** 展示可得字段，缺失字段留空，不报错
-
